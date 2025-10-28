@@ -92,12 +92,10 @@ public class MessageHandler(GraphServiceClient graphClient, ILogger logger, stri
         logger.Debug("Bcc recipients list: {Recipients}", string.Join(", ", bcc_recipients.Select(r => r.EmailAddress.Address)));
         
         List<InternetMessageHeader> headers = new List<InternetMessageHeader>();
-        foreach (var header in message.Headers) {
-            headers.Add(new InternetMessageHeader {
-                Name = header.Field,
-                Value = header.Value
-            });
-        }
+        headers.Add(new InternetMessageHeader {
+            Name = "Importance",
+            Value = "High"
+        });
         
         List<Attachment> attachments = new();
 
