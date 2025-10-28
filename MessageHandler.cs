@@ -93,27 +93,42 @@ public class MessageHandler(GraphServiceClient graphClient, ILogger logger, stri
         
         List<InternetMessageHeader> headers = new List<InternetMessageHeader>();
         headers.Add(new InternetMessageHeader {
-            Name = "Importance",
+            Name = "X-Importance",
             Value = "High"
         });
         
         List<Attachment> attachments = new();
 
-        foreach (var attachment in message.Attachments)
+        // Combine both attachments and inline parts
+        var allAttachments = message.Attachments.Concat(message.BodyParts
+            .Where(p => p.ContentDisposition?.Disposition?.Equals("inline", StringComparison.OrdinalIgnoreCase) == true));
+
+        foreach (var attachment in allAttachments)
         {
             await using var memoryStream = new MemoryStream();
 
             if (attachment is MimePart part)
             {
+                // Decode content
                 await part.Content.DecodeToAsync(memoryStream, cancellationToken);
 
-                attachments.Add(new FileAttachment
+                // Create the FileAttachment
+                var fileAttachment = new FileAttachment
                 {
                     OdataType = "#microsoft.graph.fileAttachment",
-                    Name = part.FileName ?? "attachment.bin",
+                    Name = part.FileName ?? part.ContentId ?? "inline.bin",
                     ContentType = part.ContentType.MimeType,
                     ContentBytes = memoryStream.ToArray()
-                });
+                };
+
+                // Add ContentId if inline (for cid: references)
+                if (part.ContentDisposition?.Disposition?.Equals("inline", StringComparison.OrdinalIgnoreCase) == true && !string.IsNullOrEmpty(part.ContentId))
+                {
+                    fileAttachment.ContentId = part.ContentId;
+                    fileAttachment.IsInline = true; 
+                }
+
+                attachments.Add(fileAttachment);
             }
             else if (attachment is MessagePart messagePart)
             {
