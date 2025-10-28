@@ -99,37 +99,35 @@ public class MessageHandler(GraphServiceClient graphClient, ILogger logger, stri
             });
         }
         
-        List<Attachment> attachments = new List<Attachment>();
+        List<FileAttachment> attachments = new();
 
         foreach (var attachment in message.Attachments)
         {
-            //using (var memoryStream = new MemoryStream())
-            await using (var memoryStream = new MemoryStream())
+            await using var memoryStream = new MemoryStream();
+
+            if (attachment is MimePart part)
             {
-                if (attachment is MimePart part)
-                {
-                    await part.Content.DecodeToAsync(memoryStream, cancellationToken);
+                await part.Content.DecodeToAsync(memoryStream, cancellationToken);
 
-                    attachments.Add(new Attachment
-                    {
-                        OdataType = "#microsoft.graph.fileAttachment",
-                        Name = part.FileName ?? "attachment.bin",
-                        ContentType = part.ContentType.MimeType,
-                        ContentBytes = memoryStream.ToArray()
-                    });
-                }
-                else if (attachment is MessagePart messagePart)
+                attachments.Add(new FileAttachment
                 {
-                    await messagePart.Message.WriteToAsync(memoryStream, cancellationToken);
+                    OdataType = "#microsoft.graph.fileAttachment",
+                    Name = part.FileName ?? "attachment.bin",
+                    ContentType = part.ContentType.MimeType,
+                    ContentBytes = memoryStream.ToArray()
+                });
+            }
+            else if (attachment is MessagePart messagePart)
+            {
+                await messagePart.Message.WriteToAsync(memoryStream, cancellationToken);
 
-                    attachments.Add(new Attachment
-                    {
-                        OdataType = "#microsoft.graph.fileAttachment",
-                        Name = messagePart.FileName ?? "attached-message.eml",
-                        ContentType = "message/rfc822",
-                        ContentBytes = memoryStream.ToArray()
-                    });
-                }
+                attachments.Add(new FileAttachment
+                {
+                    OdataType = "#microsoft.graph.fileAttachment",
+                    Name = messagePart.ContentDisposition?.FileName ?? "attached-message.eml",
+                    ContentType = "message/rfc822",
+                    ContentBytes = memoryStream.ToArray()
+                });
             }
         }
 
