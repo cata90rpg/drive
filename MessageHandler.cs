@@ -99,7 +99,7 @@ public class MessageHandler(GraphServiceClient graphClient, ILogger logger, stri
             });
         }
         
-        List<FileAttachment> attachments = new();
+        List<Attachment> attachments = new();
 
         foreach (var attachment in message.Attachments)
         {
